@@ -1102,18 +1102,26 @@ void LCD_clear_L(unsigned char x, unsigned char y)
   }
 }
 
+// 反转字节内位序
+static unsigned char rev8(unsigned char b)
+{
+  b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+  b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+  b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+  return b;
+}
+
 void Draw_Logo(void)
 {
-  unsigned int ii;
   unsigned char x, y;
-  // 上下翻转: 从 page7 (底部) 到 page0 (顶部) 倒序输出
+  // 纯软件180°旋转: 从数组末尾倒序读取 + 字节内位反转
   for (y = 0; y < 8; y++)
   {
-    ii = (7 - y) * 128;  // 倒数第 (7-y) 页的起始地址
     OLED_Set_Pos(0, y);
     for (x = 0; x < 128; x++)
     {
-      OLED_WrDat(NC_Logo[ii++]);
+      unsigned int idx = (7 - y) * 128 + (127 - x);
+      OLED_WrDat(rev8(NC_Logo[idx]));
     }
   }
 }
