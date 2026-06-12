@@ -54,6 +54,11 @@ uint8_t image_copy[MT9V03X_H][MT9V03X_W];
 // 低通滤波系数 (EMA), 范围 0.0~1.0, 越小越平滑
 #define FLY_EMA_ALPHA 0.80f
 
+// 四方向定点搜索参数 (无信标灯时依次到达前/右/后/左)
+#define FLY_SEARCH_RADIUS   40.0f   // 偏移半径(像素)
+#define FLY_SEARCH_ARRIVE   5.0f    // 到达判断阈值(像素), offset误差小于此值视为到达
+#define FLY_SEARCH_HOLD     50      // 到达后停顿帧数(~1秒@50fps)
+
 // ===================== PID 控制器参数 =====================
 // 系统: offset ≈ ±60像素, 输出 ±400, 周期 ~50Hz (20ms), 输出最低200
 //
@@ -73,15 +78,15 @@ uint8_t image_copy[MT9V03X_H][MT9V03X_W];
 // ==========================================================
 
 // ===================== 小车 PID 控制器参数 =====================
-#define CAR_PID_X_KP  3.0f     // 前后平移 P 增益 (PY→vx)
+#define CAR_PID_X_KP  1.50f     // 前后平移 P 增益 (PY→vx)
 #define CAR_PID_X_KI  0.02f    // 前后平移 I 增益
-#define CAR_PID_X_KD  4.0f     // 前后平移 D 增益
-#define CAR_PID_Y_KP  3.0f     // 左右平移 P 增益 (PX→vy)
+#define CAR_PID_X_KD  6.0f     // 前后平移 D 增益
+#define CAR_PID_Y_KP  1.50f     // 左右平移 P 增益 (PX→vy)
 #define CAR_PID_Y_KI  0.02f    // 左右平移 I 增益
-#define CAR_PID_Y_KD  4.0f     // 左右平移 D 增益
-#define CAR_PID_W_KP  3.0f     // 旋转 P 增益 (direct_dx→vw)
-#define CAR_PID_W_KI  0.01f    // 旋转 I 增益
-#define CAR_PID_W_KD  2.0f     // 旋转 D 增益
+#define CAR_PID_Y_KD  6.0f     // 左右平移 D 增益
+#define CAR_PID_W_KP  7.0f     // 旋转 P 增益 (direct_dx→vw)
+#define CAR_PID_W_KI  0.02f    // 旋转 I 增益
+#define CAR_PID_W_KD  4.0f     // 旋转 D 增益
 #define CAR_PID_INTEGRAL_LIMIT  100.0f
 #define CAR_PID_OUTPUT_LIMIT    300.0f
 // ==========================================================
@@ -761,58 +766,97 @@ void TrackFly_Beacon(void)
     int16_t offset_x = bar_cx - CenterX + 5;  // 水平偏移(正=偏右)
     int16_t offset_y = bar_cy - CenterY;  // 垂直偏移(正=偏下)
 
-    // 移动/静止交替: 移动1秒 → 静止1秒 → 循环 (50fps, 1秒=50帧)
-    #define MOVE_FRAMES  50  // 移动持续帧数
-    #define STOP_FRAMES  25  // 静止持续帧数
-    enum { PHASE_MOVE, PHASE_STOP };
-    static uint8_t  motion_phase = PHASE_MOVE;  // 当前阶段
-    static uint16_t phase_cnt = 0;              // 当前阶段已过帧数
+    // 四方向搜索: 前(+y) → 右(+x) → 后(-y) → 左(-x)
+    static const float search_setpoints[4][2] = {
+        { 0.0f,  FLY_SEARCH_RADIUS},   // 前方
+        { FLY_SEARCH_RADIUS,  0.0f},   // 右方
+        { 0.0f, -FLY_SEARCH_RADIUS},   // 后方
+        {-FLY_SEARCH_RADIUS,  0.0f}    // 左方
+    };
 
-    // 当检测到小车灯时，使用 PID 控制追着长条方向灯跑
-    if (is_beacon_detected && no_car_led == 0)
+    enum { STATE_TRACK, STATE_SEARCH, STATE_LOST };
+    static uint8_t state = STATE_LOST;
+    static uint8_t  search_idx = 0;     // 当前搜索位置 0~3
+    static uint16_t search_hold = 0;    // 当前位置已停顿帧数
+
+    // 状态切换
+    if (no_car_led == 1)
     {
-        // 阶段切换判断
-        if (motion_phase == PHASE_MOVE && phase_cnt >= MOVE_FRAMES)
-        {
-            motion_phase = PHASE_STOP;
-            phase_cnt = 0;
-            PID_Reset(&pid_x);
-            PID_Reset(&pid_y);
-        }
-        else if (motion_phase == PHASE_STOP && phase_cnt >= STOP_FRAMES)
-        {
-            motion_phase = PHASE_MOVE;
-            phase_cnt = 0;
-            PID_Reset(&pid_x);
-            PID_Reset(&pid_y);
-        }
-
-        if (motion_phase == PHASE_MOVE)
-        {
-            // offset_x (水平偏移) 通过 PID 产生 vy (左右平移速度)
-            vy = PID_Update(&pid_x, -(float)offset_x);
-            // offset_y (垂直偏移) 通过 PID 产生 vx (前后平移速度)
-            vx = PID_Update(&pid_y, (float)offset_y);
-        }
-        else  // PHASE_STOP
-        {
-            vx = 0.0f;
-            vy = 0.0f;
-        }
-
-        phase_cnt++;
-        vw = 0.0f;  // 无人机不旋转
+        state = STATE_LOST;
     }
-    // 其他情况下无人机静止, 重置PID防止积分饱和
+    else if (is_beacon_detected && beacon_count > 0)
+    {
+        // 有信标灯 → 追踪模式, 恢复固定 setpoint
+        if (state != STATE_TRACK)
+        {
+            state = STATE_TRACK;
+            pid_x.setpoint = 15.0f;
+            pid_y.setpoint = 15.0f;
+            PID_Reset(&pid_x);
+            PID_Reset(&pid_y);
+        }
+    }
     else
     {
+        // 无信标灯但有车灯 → 搜索模式
+        if (state != STATE_SEARCH)
+        {
+            state = STATE_SEARCH;
+            search_idx = 0;
+            search_hold = 0;
+            pid_x.setpoint = search_setpoints[0][0];
+            pid_y.setpoint = search_setpoints[0][1];
+            PID_Reset(&pid_x);
+            PID_Reset(&pid_y);
+        }
+    }
+
+    switch (state)
+    {
+    case STATE_TRACK:
+        vy = PID_Update(&pid_x, -(float)offset_x);
+        vx = PID_Update(&pid_y,  (float)offset_y);
+        vw = 0.0f;
+        break;
+
+    case STATE_SEARCH:
+        vy = PID_Update(&pid_x, -(float)offset_x);
+        vx = PID_Update(&pid_y,  (float)offset_y);
+        vw = 0.0f;
+
+        // 到达目标位置后停顿, 满 FLY_SEARCH_HOLD 帧后切换到下一个搜索位置
+        if (fabsf(offset_x - pid_x.setpoint) < FLY_SEARCH_ARRIVE &&
+            fabsf(offset_y - pid_y.setpoint) < FLY_SEARCH_ARRIVE)
+        {
+            if (search_hold >= FLY_SEARCH_HOLD)
+            {
+                search_hold = 0;
+                search_idx++;
+                if (search_idx >= 4)
+                    search_idx = 0;
+                pid_x.setpoint = search_setpoints[search_idx][0];
+                pid_y.setpoint = search_setpoints[search_idx][1];
+                PID_Reset(&pid_x);
+                PID_Reset(&pid_y);
+            }
+            search_hold++;
+        }
+        else
+        {
+            search_hold = 0;  // 还没到, 重置停顿计时
+        }
+        break;
+
+    case STATE_LOST:
+    default:
         vx = 0.0f;
         vy = 0.0f;
         vw = 0.0f;
-        motion_phase = PHASE_MOVE;
-        phase_cnt = 0;
+        search_idx = 0;
+        search_hold = 0;
         PID_Reset(&pid_x);
         PID_Reset(&pid_y);
+        break;
     }
 
     // 低通滤波 (EMA): filtered = alpha * raw + (1 - alpha) * prev
