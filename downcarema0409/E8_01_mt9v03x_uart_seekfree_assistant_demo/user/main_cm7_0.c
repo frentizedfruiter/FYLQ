@@ -72,6 +72,20 @@ uint8_t image_copy[MT9V03X_H][MT9V03X_W];
 #define PID_D_ALPHA         0.80f    // D低通滤波α(0~1, 0.8强平滑抑制高频抖)
 // ==========================================================
 
+// ===================== 小车 PID 控制器参数 =====================
+#define CAR_PID_X_KP  3.0f     // 前后平移 P 增益 (PY→vx)
+#define CAR_PID_X_KI  0.02f    // 前后平移 I 增益
+#define CAR_PID_X_KD  4.0f     // 前后平移 D 增益
+#define CAR_PID_Y_KP  3.0f     // 左右平移 P 增益 (PX→vy)
+#define CAR_PID_Y_KI  0.02f    // 左右平移 I 增益
+#define CAR_PID_Y_KD  4.0f     // 左右平移 D 增益
+#define CAR_PID_W_KP  3.0f     // 旋转 P 增益 (direct_dx→vw)
+#define CAR_PID_W_KI  0.01f    // 旋转 I 增益
+#define CAR_PID_W_KD  2.0f     // 旋转 D 增益
+#define CAR_PID_INTEGRAL_LIMIT  100.0f
+#define CAR_PID_OUTPUT_LIMIT    300.0f
+// ==========================================================
+
 typedef struct
 {
     float Kp, Ki, Kd;
@@ -176,8 +190,13 @@ static float fly_filt_vx = 0.0f;
 static float fly_filt_vy = 0.0f;
 
 // PID 控制器实例
-static PID_Controller pid_x;  // offset_x -> vy 控制
-static PID_Controller pid_y;  // offset_y -> vx 控制
+static PID_Controller pid_x;  // offset_x -> vy 控制 (飞机)
+static PID_Controller pid_y;  // offset_y -> vx 控制 (飞机)
+
+// 小车 PID 控制器实例
+static PID_Controller pid_car_x;  // PY → vx (前后平移)
+static PID_Controller pid_car_y;  // PX → vy (左右平移)
+static PID_Controller pid_car_w;  // direct_dx → vw (旋转)
 
 int16_t direct_dx = 0;
 
@@ -693,59 +712,46 @@ int TrackCar_FollowFly(void)
 {
     int16_t vx = 0, vy = 0, vw = 0;
 
-    // 情况3：未检测到小车灯 → 静止
+    // 情况3：未检测到小车灯 → 静止，重置所有 PID
     if (no_car_led == 1)
     {
-        vx=0;
-        vy=0;
-        vw=0;
+        PID_Reset(&pid_car_x);
+        PID_Reset(&pid_car_y);
+        PID_Reset(&pid_car_w);
         SetCarSpeed(0, 0, 0);
         return 0;
     }
 
-    // 情况1：只检测到小车灯，未检测到信标灯 → 仅发送旋转指令
+    // 情况1：只检测到小车灯，未检测到信标灯 → 仅 PID 旋转对齐
     if (beacon_count == 0)
     {
-        if (abs(direct_dx) > 6)
-        {
-            vw = (int16_t)(4.0f * fabs(direct_dx) + 5.0f);
-            vw = (direct_dx > 0) ? -vw : vw;
-            vx=0;
-            vy=0;
-        }
-        else
-        {
-            vw = 0;
-        }
+        PID_Reset(&pid_car_x);
+        PID_Reset(&pid_car_y);
+        vw = (int16_t)PID_Update(&pid_car_w, (float)direct_dx);
         SetCarSpeed(0, 0, vw);
         return 1;
     }
 
-    // 情况2：同时检测到小车灯和信标灯 → 发送旋转和平移指令
+    // 情况2：同时检测到小车灯和信标灯 → 旋转优先，对齐后 PID 平移追信标
     if (abs(direct_dx) > 6)
     {
+        // 方向灯未对齐 → 优先旋转，暂停平移
+        PID_Reset(&pid_car_x);
+        PID_Reset(&pid_car_y);
         vx = 0;
         vy = 0;
-        vw = (int16_t)(4.0f * fabs(direct_dx) + 5.0f);
-        vw = (direct_dx > 0) ? -vw : vw;
+        vw = (int16_t)PID_Update(&pid_car_w, (float)direct_dx);
     }
     else
     {
+        // 方向灯已对齐 → PID 控制平移追信标 (setpoint=0)
+        PID_Reset(&pid_car_w);
         vw = 0;
-        if (abs(PY) > PY_DEAD)
-        {
-            vx = (int16_t)(0.5f * fabs(PY) + 20.0f);
-            vx = (PY > 0) ? -vx : vx;
-        }
-        if (abs(PX) > PY_DEAD)
-        {
-            vy = (int16_t)(0.5f * fabs(PX) + 20.0f);
-            vy = (PX > 0) ? -vy : vy;
-        }
+        vx = (int16_t)PID_Update(&pid_car_x, (float)PY);
+        vy = (int16_t)PID_Update(&pid_car_y, (float)PX);
     }
     
     SetCarSpeed(vx, vy, vw);
-    //printf("vx:%d,vy:%d,vw:%d",vx,vy,vw);
     return 1;
 }
 
@@ -841,11 +847,19 @@ int main(void)
         xy_x1_boundary, xy_x2_boundary, xy_x3_boundary,
         xy_y1_boundary, xy_y2_boundary, xy_y3_boundary);
 
-    // 初始化 PID 控制器 (setpoint=0, min_output=200, deadband=3)
+    // 初始化飞机 PID 控制器 (setpoint=15, 飞机偏小车右前)
     PID_Init(&pid_x, PID_X_KP, PID_X_KI, PID_X_KD,
              15.0f, PID_INTEGRAL_LIMIT, PID_OUTPUT_LIMIT, 0.0f, 3.0f);
     PID_Init(&pid_y, PID_Y_KP, PID_Y_KI, PID_Y_KD,
              15.0f, PID_INTEGRAL_LIMIT, PID_OUTPUT_LIMIT, 0.0f, 3.0f);
+
+    // 初始化小车 PID 控制器 (setpoint=0, 追信标灯中心)
+    PID_Init(&pid_car_x, CAR_PID_X_KP, CAR_PID_X_KI, CAR_PID_X_KD,
+             0.0f, CAR_PID_INTEGRAL_LIMIT, CAR_PID_OUTPUT_LIMIT, 0.0f, 5.0f);
+    PID_Init(&pid_car_y, CAR_PID_Y_KP, CAR_PID_Y_KI, CAR_PID_Y_KD,
+             0.0f, CAR_PID_INTEGRAL_LIMIT, CAR_PID_OUTPUT_LIMIT, 0.0f, 5.0f);
+    PID_Init(&pid_car_w, CAR_PID_W_KP, CAR_PID_W_KI, CAR_PID_W_KD,
+             0.0f, CAR_PID_INTEGRAL_LIMIT, CAR_PID_OUTPUT_LIMIT, 0.0f, 3.0f);
 
      // printf("123");
     while (1)
