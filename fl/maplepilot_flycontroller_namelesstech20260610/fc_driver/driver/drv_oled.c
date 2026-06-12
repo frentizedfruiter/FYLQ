@@ -1104,10 +1104,12 @@ void LCD_clear_L(unsigned char x, unsigned char y)
 
 void Draw_Logo(void)
 {
-  unsigned int ii = 0;
+  unsigned int ii;
   unsigned char x, y;
+  // 上下翻转: 从 page7 (底部) 到 page0 (顶部) 倒序输出
   for (y = 0; y < 8; y++)
   {
+    ii = (7 - y) * 128;  // 倒数第 (7-y) 页的起始地址
     OLED_Set_Pos(0, y);
     for (x = 0; x < 128; x++)
     {

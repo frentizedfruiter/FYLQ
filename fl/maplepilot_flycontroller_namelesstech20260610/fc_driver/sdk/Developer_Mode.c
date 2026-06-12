@@ -373,7 +373,7 @@ void Auto_Flight_Ctrl(int16_t *mode)
     }
     maplepilot.yaw_ctrl_mode = ROTATE;
     // maplepilot.yaw_outer_control_output = rc_data.rc_rpyt[RC_YAW];//顺指针为正
-    flight_altitude_control(ALTHOLD_AUTO_POS_CTRL, 120, NUL); // 高度控制
+    flight_altitude_control(ALTHOLD_AUTO_POS_CTRL, 110, NUL); // 高度控制
     break;
   }
   case 20:
