@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# But allow directories (so git can traverse into them)
+!*/
+
+# But allow .c files
+!*.c
+
+# Allow .gitignore itself
+!.gitignore
