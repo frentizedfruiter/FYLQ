@@ -124,54 +124,6 @@ void flight_altitude_control(uint8_t mode,float target_alt,float target_vel)
       {
         //高度位置环输出给定速度期望
         maple_ctrl.height_position_ctrl.expect=target_alt;	//油门处于回中后，更新高度期望
-
-        // === 高度跳变自适应: 超过110后，跳变>9则跟随新高度；连续5帧>108则恢复110 ===
-        {
-            static uint8_t  height_gt110_flag = 0;      // 曾超过110标志
-            static float    prev_height = 0;             // 上一帧高度
-            static uint8_t  over108_cnt = 0;             // 连续超过108计数
-            static uint8_t  jump_locked = 0;             // 跳变锁定(锁定后不再响应跳变)
-
-            // 首次超过110 → 激活, 记录初始高度
-            if (!height_gt110_flag && ins.position_z > HEIGHT_TARGET)
-            {
-                height_gt110_flag = 1;
-                prev_height = ins.position_z;
-                jump_locked = 0;
-            }
-
-            if (height_gt110_flag)
-            {
-                // 连续超过108计数(用于恢复110)
-                if (ins.position_z > HEIGHT_OVER108_THR)
-                {
-                    over108_cnt++;
-                    if (over108_cnt >= HEIGHT_OVER108_CNT)
-                    {
-                        maple_ctrl.height_position_ctrl.expect = HEIGHT_TARGET;
-                        over108_cnt = 0;
-                        jump_locked = 0;  // 恢复110后重新允许跳变跟随
-                    }
-                }
-                else
-                {
-                    over108_cnt = 0;
-                }
-
-                // 跳变检测: 高度变化在(9, 30]时跟随新高度; >30视为无效数据忽略
-                {
-                    float jump = fabsf(ins.position_z - prev_height);
-                    if (!jump_locked && jump > HEIGHT_JUMP_THRESH && jump <= HEIGHT_JUMP_MAX)
-                    {
-                        maple_ctrl.height_position_ctrl.expect = ins.position_z;
-                        jump_locked = 1;  // 锁定, 不再响应后续跳变, 直到恢复110
-                    }
-                }
-
-                prev_height = ins.position_z;
-            }
-        }
-        // ==========================================================
         maple_ctrl.height_position_ctrl.feedback = ins.position_z; // 高度位置反馈
         pid_ctrl_general(&maple_ctrl.height_position_ctrl,0.001f*ALT_POS_CTRL_PERIOD);									//海拔高度位置控制器
         

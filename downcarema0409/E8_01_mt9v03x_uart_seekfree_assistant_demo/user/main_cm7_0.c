@@ -52,31 +52,31 @@ uint8_t image_copy[MT9V03X_H][MT9V03X_W];
 // ========================================================================================
 
 // 低通滤波系数 (EMA), 范围 0.0~1.0, 越小越平滑
-#define FLY_EMA_ALPHA 0.80f
+#define FLY_EMA_ALPHA 1.0f
 
-// ===================== PID 控制器参数 =====================
+// ===================== 飞机 PID 控制器参数 =====================
 // 系统: offset ≈ ±60像素, 输出 ±400, 周期 ~50Hz (20ms), 输出最低200
 //
 // 水平方向 offset_x -> vy 控制 (左右平移)
-#define PID_X_KP  1.0f     // P: offset=60→P=300, 留100给I+D凑满400
+#define PID_X_KP  5.0f     // P: offset=60→P=300, 留100给I+D凑满400
 #define PID_X_KI  0.03f    // I: 20帧×10px→Iaccum=200→I=10, 消除稳态
 #define PID_X_KD  5.0f     // D: Δ3px→D=5阻尼抑制速度抖动
 
 // 垂直方向 offset_y -> vx 控制 (前后平移)
-#define PID_Y_KP  1.0f     // P: 同水平
+#define PID_Y_KP  5.0f     // P: 加大前飞力度
 #define PID_Y_KI  0.03f    // I: 同水平
 #define PID_Y_KD  5.0f     // D: 同水平
 
 #define PID_INTEGRAL_LIMIT  150.0f  // I限幅(防windup), max_I = 0.03*150 = 4.5
 #define PID_OUTPUT_LIMIT    400.0f  // 输出限幅 ±400
-#define PID_D_ALPHA         0.80f    // D低通滤波α(0~1, 0.8强平滑抑制高频抖)
+#define PID_D_ALPHA         1.0f    // D低通滤波α(0~1, 1.0强平滑抑制高频抖)
 // ==========================================================
 
 // ===================== 小车 PID 控制器参数 =====================
-#define CAR_PID_X_KP  3.0f     // 前后平移 P 增益 (PY→vx)
+#define CAR_PID_X_KP  1.0f     // 前后平移 P 增益 (PY→vx)
 #define CAR_PID_X_KI  0.02f    // 前后平移 I 增益
 #define CAR_PID_X_KD  4.0f     // 前后平移 D 增益
-#define CAR_PID_Y_KP  3.0f     // 左右平移 P 增益 (PX→vy)
+#define CAR_PID_Y_KP  1.0f     // 左右平移 P 增益 (PX→vy)
 #define CAR_PID_Y_KI  0.02f    // 左右平移 I 增益
 #define CAR_PID_Y_KD  4.0f     // 左右平移 D 增益
 #define CAR_PID_W_KP  3.0f     // 旋转 P 增益 (direct_dx→vw)
@@ -758,20 +758,18 @@ int TrackCar_FollowFly(void)
 void TrackFly_Beacon(void)
 {
     float vx = 0.0f, vy = 0.0f, vw = 0.0f;
-    int16_t offset_x = bar_cx - CenterX + 5;  // 水平偏移(正=偏右)
+    int16_t offset_x = bar_cx - CenterX;  // 水平偏移(正=偏右)
     int16_t offset_y = bar_cy - CenterY;  // 垂直偏移(正=偏下)
 
-    // 移动/静止交替: 移动1秒 → 静止1秒 → 循环 (50fps, 1秒=50帧)
-    #define MOVE_FRAMES  50  // 移动持续帧数
-    #define STOP_FRAMES  25  // 静止持续帧数
+    // 移动/静止交替: 移动1秒 → 静止0.5秒 → 循环 (50fps)
+    #define MOVE_FRAMES  50
+    #define STOP_FRAMES  25
     enum { PHASE_MOVE, PHASE_STOP };
-    static uint8_t  motion_phase = PHASE_MOVE;  // 当前阶段
-    static uint16_t phase_cnt = 0;              // 当前阶段已过帧数
+    static uint8_t  motion_phase = PHASE_MOVE;
+    static uint16_t phase_cnt = 0;
 
-    // 当检测到小车灯时，使用 PID 控制追着长条方向灯跑
     if (is_beacon_detected && no_car_led == 0)
     {
-        // 阶段切换判断
         if (motion_phase == PHASE_MOVE && phase_cnt >= MOVE_FRAMES)
         {
             motion_phase = PHASE_STOP;
@@ -789,21 +787,18 @@ void TrackFly_Beacon(void)
 
         if (motion_phase == PHASE_MOVE)
         {
-            // offset_x (水平偏移) 通过 PID 产生 vy (左右平移速度)
             vy = PID_Update(&pid_x, -(float)offset_x);
-            // offset_y (垂直偏移) 通过 PID 产生 vx (前后平移速度)
-            vx = PID_Update(&pid_y, (float)offset_y);
+            vx = PID_Update(&pid_y,  (float)offset_y);
         }
-        else  // PHASE_STOP
+        else
         {
             vx = 0.0f;
             vy = 0.0f;
         }
 
         phase_cnt++;
-        vw = 0.0f;  // 无人机不旋转
+        vw = 0.0f;
     }
-    // 其他情况下无人机静止, 重置PID防止积分饱和
     else
     {
         vx = 0.0f;
@@ -847,11 +842,11 @@ int main(void)
         xy_x1_boundary, xy_x2_boundary, xy_x3_boundary,
         xy_y1_boundary, xy_y2_boundary, xy_y3_boundary);
 
-    // 初始化飞机 PID 控制器 (setpoint=15, 飞机偏小车右前)
+    // 初始化飞机 PID 控制器 (setpoint=0, 飞机在小车正上方)
     PID_Init(&pid_x, PID_X_KP, PID_X_KI, PID_X_KD,
-             15.0f, PID_INTEGRAL_LIMIT, PID_OUTPUT_LIMIT, 0.0f, 3.0f);
+             0.0f, PID_INTEGRAL_LIMIT, PID_OUTPUT_LIMIT, 0.0f, 3.0f);
     PID_Init(&pid_y, PID_Y_KP, PID_Y_KI, PID_Y_KD,
-             15.0f, PID_INTEGRAL_LIMIT, PID_OUTPUT_LIMIT, 0.0f, 3.0f);
+             0.0f, PID_INTEGRAL_LIMIT, PID_OUTPUT_LIMIT, 0.0f, 3.0f);
 
     // 初始化小车 PID 控制器 (setpoint=0, 追信标灯中心)
     PID_Init(&pid_car_x, CAR_PID_X_KP, CAR_PID_X_KI, CAR_PID_X_KD,
