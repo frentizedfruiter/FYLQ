@@ -4,7 +4,7 @@
 
 #define PIT0                             (PIT_CH0 )                             // 使用的周期中断编号
 
-#define ENCODER_QUAD1                    (TC_CH07_ENCODER)                      // 编码器接口  
+#define ENCODER_QUAD1                    (TC_CH07_ENCODER) //小车接线                   // 编码器接口  
 #define ENCODER_QUAD1_PHASE_A            (TC_CH07_ENCODER_CH1_P07_6)            // PHASE_A 对应的引脚                 
 #define ENCODER_QUAD1_PHASE_B            (TC_CH07_ENCODER_CH2_P07_7)            // PHASE_B 对应的引脚                   
                                                                                 
@@ -20,17 +20,17 @@
 #define ENCODER_QUAD4_PHASE_A            (TC_CH27_ENCODER_CH1_P19_2)                              
 #define ENCODER_QUAD4_PHASE_B            (TC_CH27_ENCODER_CH2_P19_3)                                
                                                                                 
-#define AIN1 P03_3
-// #define AIN2 P04_0
+#define AIN1 P03_3 //小车接线
+#define AIN2 P04_0
 #define BIN1 P03_1
-// #define BIN2 P02_4
+#define BIN2 P02_4
 #define CIN1 P04_0
-// #define CIN2 P00_2
+#define CIN2 P00_2
 #define DIN1 P05_4
-// #define DIN2 P02_2
+#define DIN2 P02_2
 
 
-#define PWM_CH1                 (TCPWM_CH02_P06_5)
+#define PWM_CH1                 (TCPWM_CH02_P06_5)//小车接线
 #define PWM_CH2                 (TCPWM_CH06_P02_1)
 #define PWM_CH3                 (TCPWM_CH09_P05_0)
 #define PWM_CH4                 (TCPWM_CH10_P05_1)
