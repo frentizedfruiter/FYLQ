@@ -299,15 +299,20 @@ void SetMotor1Speed(int16_t speed)
   if (speed > 0)
   {
     gpio_set_level(AIN1,1);
-    // gpio_set_level(AIN2,0);
+    gpio_set_level(AIN2,0);
     Set_PWM1_Pause(speed);
+  }
+  else if (speed < 0)
+  {
+    gpio_set_level(AIN1,0);
+    gpio_set_level(AIN2,1);
+    Set_PWM1_Pause((-1)*speed);
   }
   else
   {
     gpio_set_level(AIN1,0);
-    // gpio_set_level(AIN2,1);
-    Set_PWM1_Pause((-1)*speed);
- 
+    gpio_set_level(AIN2,0);
+    Set_PWM1_Pause(0);
   }
 }
 
@@ -316,15 +321,20 @@ void SetMotor2Speed(int16_t speed)
   if (speed > 0)
   {
     gpio_set_level(BIN1,0);
-    // gpio_set_level(BIN2,0);
+    gpio_set_level(BIN2,1);
     Set_PWM2_Pause(speed);
+  }
+  else if (speed < 0)
+  {
+    gpio_set_level(BIN1,1);
+    gpio_set_level(BIN2,0);
+    Set_PWM2_Pause((-1)*speed);
   }
   else
   {
-    gpio_set_level(BIN1,1);
-    // gpio_set_level(BIN2,1);
-    Set_PWM2_Pause((-1)*speed);
- 
+    gpio_set_level(BIN1,0);
+    gpio_set_level(BIN2,0);
+    Set_PWM2_Pause(0);
   }
 }
 
@@ -333,15 +343,20 @@ void SetMotor3Speed(int16_t speed)
   if (speed > 0)
   {
     gpio_set_level(CIN1,0);
-    // gpio_set_level(CIN2,0);
+    gpio_set_level(CIN2,1);
     Set_PWM3_Pause(speed);
+  }
+  else if (speed < 0)
+  {
+    gpio_set_level(CIN1,1);
+    gpio_set_level(CIN2,0);
+    Set_PWM3_Pause((-1)*speed);
   }
   else
   {
-    gpio_set_level(CIN1,1);
-    // gpio_set_level(CIN2,1);
-    Set_PWM3_Pause((-1)*speed);
- 
+    gpio_set_level(CIN1,0);
+    gpio_set_level(CIN2,0);
+    Set_PWM3_Pause(0);
   }
 }
 
@@ -350,15 +365,20 @@ void SetMotor4Speed(int16_t speed)
   if (speed > 0)
   {
     gpio_set_level(DIN1,1);
-    // gpio_set_level(DIN2,0);
+    gpio_set_level(DIN2,0);
     Set_PWM4_Pause(speed);
+  }
+  else if (speed < 0)
+  {
+    gpio_set_level(DIN1,0);
+    gpio_set_level(DIN2,1);
+    Set_PWM4_Pause((-1)*speed);
   }
   else
   {
     gpio_set_level(DIN1,0);
-    // gpio_set_level(DIN2,1);
-    Set_PWM4_Pause((-1)*speed);
- 
+    gpio_set_level(DIN2,0);
+    Set_PWM4_Pause(0);
   }
 }
 
@@ -483,13 +503,13 @@ int main(void)
     pwm_init(PWM_CH4, 17000, 0);
 
     gpio_init(AIN1, GPO, 0, GPO_PUSH_PULL);
-    // gpio_init(AIN2, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(AIN2, GPO, 0, GPO_PUSH_PULL);
     gpio_init(BIN1, GPO, 0, GPO_PUSH_PULL);
-    // gpio_init(BIN2, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(BIN2, GPO, 0, GPO_PUSH_PULL);
     gpio_init(CIN1, GPO, 0, GPO_PUSH_PULL);
-    // gpio_init(CIN2, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(CIN2, GPO, 0, GPO_PUSH_PULL);
     gpio_init(DIN1, GPO, 0, GPO_PUSH_PULL);
-    // gpio_init(DIN2, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(DIN2, GPO, 0, GPO_PUSH_PULL);
 
     encoder_quad_init(ENCODER_QUAD1,  ENCODER_QUAD1_PHASE_A, ENCODER_QUAD1_PHASE_B);  // 初始化编码器模块与引脚 正交编码器模式
     encoder_quad_init(ENCODER_QUAD2,  ENCODER_QUAD2_PHASE_A, ENCODER_QUAD2_PHASE_B);  // 初始化编码器模块与引脚 正交编码器模式
