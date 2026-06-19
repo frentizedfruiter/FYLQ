@@ -24,7 +24,7 @@
 #define AIN2 P04_0
 #define BIN1 P03_1
 #define BIN2 P02_4
-#define CIN1 P04_0
+#define CIN1 P04_1
 #define CIN2 P00_2
 #define DIN1 P05_4
 #define DIN2 P02_2
