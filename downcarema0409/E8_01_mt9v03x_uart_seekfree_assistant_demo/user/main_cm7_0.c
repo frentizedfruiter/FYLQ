@@ -73,16 +73,16 @@ uint8_t image_copy[MT9V03X_H][MT9V03X_W];
 // ==========================================================
 
 // ===================== 小车 PID 控制器参数 =====================
-#define CAR_PID_X_KP  1.0f     // 前后平移 P 增益 (PY→vx)
-#define CAR_PID_X_KI  0.02f    // 前后平移 I 增益
+#define CAR_PID_X_KP  5.0f     // 前后平移 P 增益 (PY→vx)
+#define CAR_PID_X_KI  0.03f    // 前后平移 I 增益
 #define CAR_PID_X_KD  4.0f     // 前后平移 D 增益
-#define CAR_PID_Y_KP  1.0f     // 左右平移 P 增益 (PX→vy)
-#define CAR_PID_Y_KI  0.02f    // 左右平移 I 增益
+#define CAR_PID_Y_KP  5.0f     // 左右平移 P 增益 (PX→vy)
+#define CAR_PID_Y_KI  0.03f    // 左右平移 I 增益
 #define CAR_PID_Y_KD  4.0f     // 左右平移 D 增益
 #define CAR_PID_W_KP  3.0f     // 旋转 P 增益 (direct_dx→vw)
 #define CAR_PID_W_KI  0.01f    // 旋转 I 增益
 #define CAR_PID_W_KD  2.0f     // 旋转 D 增益
-#define CAR_PID_INTEGRAL_LIMIT  100.0f
+#define CAR_PID_INTEGRAL_LIMIT  200.0f
 #define CAR_PID_OUTPUT_LIMIT    300.0f
 // ==========================================================
 
@@ -873,7 +873,7 @@ int main(void)
                 }
             }
             find_bright_center();                    // 先解算当前帧的方向指示灯特征点、位置、方向
-           //seekfree_assistant_camera_send();        // 再发送图像+当前帧的边界数据到上位机
+            //seekfree_assistant_camera_send();        // 再发送图像+当前帧的边界数据到上位机
             TrackFly_Beacon();                        // 无人机追小车灯平移
             TrackCar_FollowFly();
            //printf("信标灯数量： %d\n",beacon_count);
