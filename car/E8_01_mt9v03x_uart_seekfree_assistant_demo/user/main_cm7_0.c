@@ -113,8 +113,8 @@ PIDInformation MotorSpeed1 =
   .Ki = 50.0,
   .Kd = 0.0,
   .MaxErrorInt = 37500,
-  .MaxOut = 2000,
-  .MinOut = -2000,         // 新增：输出限幅最小值（原代码只限了上限）
+  .MaxOut = 6000,          //新车模修改：增大限幅，实测空载4000稍快，现限到6000，后面承重再改
+  .MinOut = -6000,         // 新增：输出限幅最小值（原代码只限了上限）
   .SampleTime = 0.01,     // 新增：采样时间（s），用于标准化Ki/Kd
 
   .FeedRatio = 10
@@ -134,8 +134,8 @@ PIDInformation MotorSpeed2 =
   .Ki = 50.0,
   .Kd = 0.0,
   .MaxErrorInt = 37500,
-  .MaxOut = 2000,
-  .MinOut = -2000,         // 新增：输出限幅最小值（原代码只限了上限）
+  .MaxOut = 6000,          //新车模修改：增大限幅，实测空载4000稍快，现限到6000，后面承重再改
+  .MinOut = -6000,         // 新增：输出限幅最小值（原代码只限了上限）
   .SampleTime = 0.01,     // 新增：采样时间（s），用于标准化Ki/Kd
 
   .FeedRatio = 10
@@ -517,20 +517,42 @@ int main(void)
     encoder_quad_init(ENCODER_QUAD4,  ENCODER_QUAD4_PHASE_A, ENCODER_QUAD4_PHASE_B);       // 初始化编码器模块与引脚 带方向增量编码器模式
     pit_ms_init(PIT0, 1);    // 初始化 PIT0 为周期中断 1ms 周
 
-    system_delay_ms(1000);
-    // SetCarSpeed(0, 0, 60);
-    // system_delay_ms(1000);
-    // SetCarSpeed(0, 0, 0);
-    // system_delay_ms(1000);
-    // SetCarSpeed(60, 0, 0);
-    // system_delay_ms(1000);
-    // SetCarSpeed(0, 0, 0);
-    // system_delay_ms(1000);
+    system_delay_ms(10);
+    // ========== 小车运动测试序列 ==========
+    // 前走 2s
+    //SetCarSpeed(2, 0, 0);
+    //SetWhellSpeed();
+    //SetMotor1Speed(1000);
+    // 后走 2s
+    //SetCarSpeed(-2, 0, 0);
+    //SetWhellSpeed();
+    //system_delay_ms(2000);
+    // 左走 2s
+    //SetCarSpeed(0, 2, 0);
+    //SetWhellSpeed();
+    //system_delay_ms(2000);
+    // 右走 2s
+    //SetCarSpeed(0, -2, 0);
+    //SetWhellSpeed();
+    //system_delay_ms(2000);
+    // 顺时针转 2s
+    //SetCarSpeed(0, 0, -2);
+    //SetWhellSpeed();
+    //system_delay_ms(2000);
+    // 逆时针转 2s
+    //SetCarSpeed(0, 0, 2);
+    //SetWhellSpeed();
+    //system_delay_ms(2000);
+    // 停止
+    //SetCarSpeed(0, 0, 0);
+    //SetWhellSpeed();
+    // ========== 测试结束 ==========
 
 
     // 此处编写用户代码 例如外设初始化代码等
     while(true)
-    {
+    {//SetMotor1Speed(4000);//添加测试项
+    SetCarSpeed(10, 0, 0);
       fifo_data_count = fifo_used(&uart_data_fifo); 
 
        if(fifo_data_count != 0)                                                // 读取到数据了
@@ -552,7 +574,7 @@ int main(void)
            // 1. 清除标志位，防止重复处理
            Serial_RxFlag = 0;
            RxPacket_to_SpeedPacket();
-           SetCarSpeed(SpeedPacket[0], SpeedPacket[1], SpeedPacket[2]);
+           //SetCarSpeed(SpeedPacket[0], SpeedPacket[1], SpeedPacket[2]);
            // 2. 输出解析结果（替代原例程的“回显所有数据”）
            // uart_write_string(UART_INDEX, "\r\nUART parse data: ");
            // for(int i=0; i<4; i++)

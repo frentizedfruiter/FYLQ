@@ -41,6 +41,7 @@
 
 extern uint8 pit_state;
 extern uint8 get_speed_time;
+extern int16_t GetSpeed1(void);
 extern void SetWhellSpeed(void);
 
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
@@ -48,11 +49,11 @@ void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数
     pit_isr_flag_clear(PIT_CH0);
     pit_state = 1;
     get_speed_time++;
-    if (get_speed_time >= 10)
+    if (get_speed_time >= 100)
     {
          get_speed_time = 0;
          SetWhellSpeed();
-         // printf("ENCODER_DATA_QUAD2 counter \t\t%d .\r\n", GetSpeed2());      // 输出编码器计数信息
+         printf("ENCODER_DATA_QUAD1 counter \t\t%d .\r\n", GetSpeed1());      // 输出编码器计数信息
          // printf("ENCODER_DATA_QUAD3 counter \t\t%d .\r\n", GetSpeed3());      // 输出编码器计数信息
          // printf("ENCODER_DATA_QUAD4 counter \t\t%d .\r\n", GetSpeed4());      // 输出编码器计数信息
     }
