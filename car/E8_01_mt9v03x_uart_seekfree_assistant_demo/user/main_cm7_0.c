@@ -30,7 +30,7 @@
 #define DIN2 P02_2
 
 
-#define PWM_CH1                 (TCPWM_CH02_P06_5)//小车接线
+#define PWM_CH1                 (TCPWM_CH02_P06_5)//小车接线,注意核对
 #define PWM_CH2                 (TCPWM_CH06_P02_1)
 #define PWM_CH3                 (TCPWM_CH09_P05_0)
 #define PWM_CH4                 (TCPWM_CH10_P05_1)
