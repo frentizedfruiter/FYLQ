@@ -24,8 +24,8 @@
 #define AIN2 P04_0
 #define BIN1 P03_1
 #define BIN2 P02_4
-#define CIN1 P04_1
-#define CIN2 P00_2
+#define CIN1 P00_2
+#define CIN2 P04_1
 #define DIN1 P05_4
 #define DIN2 P02_2
 
@@ -551,7 +551,7 @@ int main(void)
 
     // 此处编写用户代码 例如外设初始化代码等
     while(true)
-    {//SetMotor1Speed(4000);//添加测试项
+    {//SetMotor2Speed(4000);//添加测试项
     SetCarSpeed(10, 0, 0);
       fifo_data_count = fifo_used(&uart_data_fifo); 
 
